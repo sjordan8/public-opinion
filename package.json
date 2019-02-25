@@ -1,0 +1,27 @@
+{
+  "name": "public-opinion",
+  "version": "1.0.0",
+  "description": "MERN fullstack web app that uses the twitter API to pull tweets from trending topics and runs those tweets through Google's natural language processor to decide whether the public opinion is positive or negative.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sjordan8/public-opinion.git"
+  },
+  "author": "Sean Jordan",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sjordan8/public-opinion/issues"
+  },
+  "homepage": "https://github.com/sjordan8/public-opinion#readme",
+  "dependencies": {
+    "express": "^4.16.4",
+    "mongodb": "^3.1.13",
+    "mongoose": "^5.4.14",
+    "nodemon": "^1.18.10"
+  }
+}
