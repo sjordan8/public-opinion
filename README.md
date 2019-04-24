@@ -9,6 +9,9 @@ The Node.js server hits the Twitter API and pull tweets from Twitter's trending 
 I'm thinking about hosting this on AWS on my own personal EC2 instance or possibly containerizing this app and turning it into a microservices demo that functions with dummy data.
 
 ## How to run it
-```git clone https://github.com/sjordan8/public-opinion.git
+```
+git clone https://github.com/sjordan8/public-opinion.git
 cd public-opinion
-npm run start```
+npm run start
+```
+
