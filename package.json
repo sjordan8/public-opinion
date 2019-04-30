@@ -2,10 +2,10 @@
   "name": "public-opinion",
   "version": "1.0.0",
   "description": "MERN fullstack web app that uses the twitter API to pull tweets from trending topics and runs those tweets through Google's natural language processor to decide whether the public opinion is positive or negative.",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "start": "node app.js",
+    "dev": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,7 +21,7 @@
   "dependencies": {
     "express": "^4.16.4",
     "mongodb": "^3.1.13",
-    "mongoose": "^5.4.14",
-    "nodemon": "^1.18.10"
+    "nodemon": "^1.18.10",
+    "twit": "^2.2.11"
   }
 }
