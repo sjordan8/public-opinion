@@ -66,3 +66,7 @@ data/
 
 #API keys
 config/
+
+#Generated JSON data
+cities.json
+cities_coordinates.json
