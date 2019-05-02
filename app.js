@@ -50,8 +50,8 @@ app.get('/get_cities', function(req, res) {
         });
         res.send(trends);
     })
-    
-   /* 
+
+   /*
     T.get('trends/place', { id: '2487956' }, function (err, data, response) {
         res.send(data);
     })*/
@@ -62,20 +62,24 @@ app.get('/get_coordinates', function(req, res) {
     var cities = JSON.parse(d);
     for (var i = 0; i < cities.length; i++) {
         var city = cities[i];
-        T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, function (err, data, response) {
-            if (err) {
-                console.log("Hit the limit, probably");
-            }
-            else {
-                var obj = result.places[0];
-                city["centroid"] = obj["centroid"];
-                cities[i] = city;
-            }
-        })
+        if(!city.hasOwnProperty("centroid")) {
+            T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, function (err, data, response) {
+                if (err) {
+                    console.log("Hit the limit, probably");
+                }
+                else {
+                    var obj = data.result.places[0];
+                    city["centroid"] = obj["centroid"];
+                    cities[i] = city;
+                }
+            })
+        }
+
     }
+
     var cityData = JSON.stringify(cities);
-    fs.writeFile('cities_coordinates.json', cityData, function(err) {
-        console.log("Wrote to the new file!");
+    fs.writeFile('cities.json', cityData, function(err) {
+        console.log("Wrote to the same file!");
     });
     res.send(cities);
 });
