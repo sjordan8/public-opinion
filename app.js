@@ -21,6 +21,47 @@ const app = express();
 
 app.use(express.static('static'));
 
+async function lookupCoords() {
+    let d = fs.readFileSync('cities.json');
+    let cities = JSON.parse(d);
+    
+    let promise = new Promise((res, rej) => {
+        let d = fs.readFileSync('cities.json');
+        let cities = JSON.parse(d);
+
+        for (let i = 0; i < cities.length; i++) {
+            let city = cities[i];
+            if(!city.hasOwnProperty("centroid")) {
+                T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, function (err, data, response) {
+                    if (err) {
+                        console.log("Hit the limit, probably");
+                    }
+                    else {
+                        let obj = data.result.places[0];
+                        city["centroid"] = obj["centroid"];
+                        console.log(city["centroid"]);
+                        cities[i] = city;
+                        console.log(cities[i]);
+                        let cityData = JSON.stringify(cities);
+                        fs.writeFile('cities.json', cityData, function(err) {
+                            console.log("Wrote city");
+                        });
+                    }
+                })
+            }
+        }
+        res(cities);
+    });
+
+    console.log("Waiting for the promise to complete");
+    let newCities = await promise;
+    console.log(newCities[0]);
+    let cityData = JSON.stringify(newCities);
+    fs.writeFile('cities.json', cityData, function(err) {
+        console.log("Wrote the new version of the cities");
+    });
+};
+
 app.get('/', function(req, res) {
     res.sendFile('index.html', { root: __dirname });
 });
@@ -58,30 +99,8 @@ app.get('/get_cities', function(req, res) {
 });
 
 app.get('/get_coordinates', function(req, res) {
-    var d = fs.readFileSync('cities.json');
-    var cities = JSON.parse(d);
-    for (var i = 0; i < cities.length; i++) {
-        var city = cities[i];
-        if(!city.hasOwnProperty("centroid")) {
-            T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, function (err, data, response) {
-                if (err) {
-                    console.log("Hit the limit, probably");
-                }
-                else {
-                    var obj = data.result.places[0];
-                    city["centroid"] = obj["centroid"];
-                    cities[i] = city;
-                }
-            })
-        }
-
-    }
-
-    var cityData = JSON.stringify(cities);
-    fs.writeFile('cities.json', cityData, function(err) {
-        console.log("Wrote to the same file!");
-    });
-    res.send(cities);
+    lookupCoords();
+    res.send("Filling cities");
 });
 
         //console.log(data.result['places']);
