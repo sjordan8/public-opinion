@@ -1,15 +1,24 @@
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
 const language = require('@google-cloud/language');
-const MongoClient = require('mongodb').MongoClient;
+const mongoose = require('mongoose');
 const Twit = require('twit');
 const keys = require('./config/keys');
 
-const client = new MongoClient(keys.mongoURI, { useNewUrlParser: true });
-client.connect(err => {
+let City = require('./models/city');
 
-  client.close();
-})
+mongoose.connect('mongodb://localhost/opinion');
+
+let db = mongoose.connection;
+
+db.once('open', function() {
+    console.log('Server connected to mongoDB');
+});
+
+db.on('error', function(err) {
+    console.log(err);
+});
 
 const T = new Twit({
   consumer_key:         keys.consumer_key,
@@ -20,13 +29,27 @@ const T = new Twit({
 
 const app = express();
 
+app.use(express.static('static'));
+
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'pug');
+
 app.get('/', function(req, res) {
-    res.sendFile('index.html', { root: __dirname });
+    City.find({}, function(err, cities){
+        if(err){
+            console.log(err);
+        } else {
+            res.render('index', {
+                cities: cities
+            });
+        }
+    });
 });
 
 app.get('/us', function(req, res) {
     res.sendFile('/static/us.json', { root: __dirname });
 });
+
 //Trends Function
 app.get('/get_cities', function(req, res) {
     T.get('trends/available', function (err, data, response)
@@ -61,7 +84,6 @@ app.get('/get_cities', function(req, res) {
         });
         res.send(trends);
     })
-
 });
 
 app.get('/get_coordinates', function(req, res) {
