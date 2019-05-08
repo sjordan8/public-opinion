@@ -20,6 +20,7 @@
   "homepage": "https://github.com/sjordan8/public-opinion#readme",
   "dependencies": {
     "@google-cloud/language": "^2.1.0",
+    "body-parser": "^1.19.0",
     "express": "^4.16.4",
     "mongodb": "^3.1.13",
     "mongoose": "^5.5.6",

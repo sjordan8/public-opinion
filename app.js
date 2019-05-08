@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const language = require('@google-cloud/language');
 const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
 const Twit = require('twit');
 const keys = require('./config/keys');
 
@@ -31,8 +32,13 @@ const app = express();
 
 app.use(express.static('static'));
 
+// Pug middleware
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
+
+// Body Parse Middleware
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 app.get('/', function(req, res) {
     City.find({}, function(err, cities){
@@ -46,8 +52,16 @@ app.get('/', function(req, res) {
     });
 });
 
+app.get('/add', function(req, res) {
+    res.render('add');
+    return;
+});
+
+
+
 app.get('/us', function(req, res) {
     res.sendFile('/static/us.json', { root: __dirname });
+    return;
 });
 
 //Trends Function
@@ -84,6 +98,7 @@ app.get('/get_cities', function(req, res) {
         });
         res.send(trends);
     })
+    return;
 });
 
 app.get('/get_coordinates', function(req, res) {
@@ -117,6 +132,7 @@ app.get('/get_coordinates', function(req, res) {
         }
     }
     res.send("Filling cities");
+    return;
 });
 // Testing for San Francisco
 app.get('/get_trends_for_city', function(req, res) {
@@ -167,6 +183,7 @@ app.get('/get_trends_for_city', function(req, res) {
         res.send(topTen);
 
     })
+    return;
 });
 
 app.get('/get_tweets_for_trend', function(req, res) {
@@ -175,6 +192,7 @@ app.get('/get_tweets_for_trend', function(req, res) {
     {
         res.send(data);
     })
+    return;
 });
 
 app.get('/analyze_tweet', function(req, res) {
@@ -203,6 +221,7 @@ app.get('/analyze_tweet', function(req, res) {
             console.log(` - Wikipedia URL: ${entity.metadata.wikipedia_url}$`);
         }
     });
+    return;
 });
 
 const PORT = process.env.PORT || 5000;
