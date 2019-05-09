@@ -2,10 +2,19 @@ doctype html
 html
     head
         title Public Opinion
+        link(rel='stylesheet' href='/css/foundation.css')
+        link(rel='stylesheet' href='/css/app.css')
+               
         block header
     body
-        block content
-        br
-        hr
-        footer
-            p Copyright &copy 2019
+        .grid-container
+            block content
+            br
+            hr
+            footer
+                p Copyright &copy 2019
+            script(src='/js/vendor/jquery.js')
+            script(src='/js/vendor/what-input.js')
+            script(src='/js/vendor/foundation.js')
+            script(src='/js/app.js') 
+            script(src='/d3/d3.min.js')

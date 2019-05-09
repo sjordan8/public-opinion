@@ -8,10 +8,13 @@ const Twit = require('twit');
 const keys = require('./config/keys');
 
 let City = require('./models/city');
+let Tweet = require('./models/tweet');
 
 mongoose.connect('mongodb://localhost/opinion');
 
 let db = mongoose.connection;
+
+const client = new language.LanguageServiceClient();
 
 db.once('open', function() {
     console.log('Server connected to mongoDB');
@@ -69,9 +72,7 @@ app.get('/get_cities', function(req, res) {
     T.get('trends/available', function (err, data, response)
     {
         let trends = data;
-        let d = fs.readFileSync('cities.json');
-        let cities = JSON.parse(d);
-        for (let i = 0; i < trends.length - 1; i++)
+        for (let i = 0; i < trends.length; i++)
         {
             let trend = trends[i];
             if (trend["country"] == "United States")
@@ -79,147 +80,167 @@ app.get('/get_cities', function(req, res) {
                 let place = trend["placeType"];
                 if (place["name"] == "Town")
                 {
-                    let insert = true;
-                    for (let j = 0; j < cities.length; j++)
-                    {
-                        let city = cities[j];
-                        if (city["name"] == trend["name"])
-                            insert = false;
-                    }
-                    if (insert)
-                        cities.push({ "name": trend["name"], "woeid": trend["woeid"] });
+                    City.find({ name: trend["name"] }, function(err, cities){
+                        if(err){
+                            console.log(err);
+                        } else {
+                            let city = new City();
+                            city.name = trend["name"];
+                            city.woeid = trend["woeid"];
+
+                            city.save(function(err) {
+                                if(err) {
+                                    console.log(err);
+                                } 
+                            });
+                        }
+                    });
                 }
             }
         }
-        let cityData = JSON.stringify(cities);
-        fs.writeFile('cities.json', cityData, function(err)
-        {
-            console.log("Written Cities!");
-        });
-        res.send(trends);
+        console.log("Written Cities!");
+        res.redirect('back');
     })
     return;
 });
 
 app.get('/get_coordinates', function(req, res) {
 
-    let d = fs.readFileSync('cities.json');
-    let cities = JSON.parse(d);
-
-    for (let i = 0; i < cities.length; i++)
-    {
-        let city = cities[i];
-        if(!city.hasOwnProperty("centroid"))
+    City.find({ centroid: [] }, function (err, cities) {
+        for (let i = 0; i < cities.length; i++)
         {
+            let city = cities[i];
             T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, function (err, data, response)
             {
                 if (err)
+                {
                     console.log(err);
+                    return;
+                }
                 else
                 {
                     let obj = data.result.places[0];
-                    city["centroid"] = obj["centroid"];
-                    console.log(city["centroid"]);
-                    cities[i] = city;
-                    console.log(cities[i]);
-                    let cityData = JSON.stringify(cities);
-                    fs.writeFile('cities.json', cityData, function(err)
-                    {
-                        console.log("Wrote city");
+                    city.centroid = obj["centroid"];
+                    city.save(function(err) {
+                        if (err)
+                            console.log(err);
                     });
+                    console.log(city["centroid"]);
                 }
             })
         }
-    }
-    res.send("Filling cities");
+    });
+    res.redirect('back');
     return;
 });
-// Testing for San Francisco
-app.get('/get_trends_for_city', function(req, res) {
-    let d = fs.readFileSync('cities.json');
-    let cities = JSON.parse(d);
-    let city = cities[0];
-    let topTen = [];
-    let j;
 
-    for (j = 0; j < cities.length; j++)
-    {
-        city = cities[j];
-        if(city["woeid"] == "2487956")
-            break;
-    }
-
-    if(city.hasOwnProperty("trends"))
-        topTen = city["trends"];    
-
-    T.get('trends/place', { id: "2487956" }, function (err, data, response)
-    {
-        let obj = data[0];
-        let trends = obj["trends"];
-
-        for (let i = 0; i < 10; i++)
+app.get('/get_trends/:woeid', function(req, res) {
+    City.find({ woeid: req.params.woeid }, function (err, cities) { 
+        let city = cities[0];
+        T.get('trends/place', { id: req.params.woeid }, function (err, data, response)
         {
-            let trend = trends[i];
-            let insert = true;
-            console.log(trend["name"]);
-            for (let k = 0; k < topTen.length; k++)
-            {
-                let cur = topTen[k];
-                if (trend["name"] == cur["name"])
-                    insert = false;
+            let obj = data[0];
+            let topTrends = obj["trends"];
+            let trends = topTrends.slice(0,10);
+
+            city.trends = trends;
+            city.save(function(err) {
+                if (err)
+                    console.log(err);
+            });
+            res.redirect('back');
+
+        })
+    });
+    return;
+});
+
+app.get('/get_tweets/:woeid/:query', function(req, res) {
+    City.find({ woeid: req.params.woeid }, function (err, cities) {
+        let city = cities[0];
+        let latitude = city.centroid[1];
+        let longitude = city.centroid[0];
+        let r = "5mi";
+        let geo = [ latitude, longitude, r ];
+        T.get('search/tweets', { q: req.params.query, geocode: geo, count: "100" } , function (err, data, response)
+        {
+            if(err) {
+                console.log(err);
             }
-            if (insert)
-                topTen.push(trend);
-        }
-        console.log(topTen);
-        city["trends"] = topTen;
-        cities[j] = city;
-        let cityData = JSON.stringify(cities);
-        fs.writeFile('cities.json', cityData, function(err)
+            else {
+                let tweets = data.statuses;
+                for( let i = 0; i < tweets.length; i++)
+                {
+                    let t = tweets[i];
+                    Tweet.find({ id: t.id }, function (err, tweets) {
+                        if (tweets.length == 0) {
+                            let tweet = new Tweet();
+                            tweet.created_at = t.created_at;
+                            tweet.text = t.text;
+                            tweet.id = t.id;
+                            tweet.woeid = req.params.woeid;
+                            tweet.trend = req.params.query;
+                            tweet.save(function(err) {
+                                if(err) {
+                                    console.log(err);
+                                }
+                            });
+                        }
+                    });
+                }
+                console.log("Added around " + tweets.length + " tweets to the DB");
+                res.redirect('back');
+            }
+        })     
+    });
+    return;
+});
+
+app.get('/analyze_tweets', function(req, res) {
+    Tweet.find({ sentiment: null }, function (err, tweets) {
+        for(let i = 0; i < tweets.length; i++)
         {
-            console.log("Wrote city with topTen trends");
-        });
-        console.log(cities[j]);
-        res.send(topTen);
-
-    })
-    return;
-});
-
-app.get('/get_tweets_for_trend', function(req, res) {
-
-    T.get('search/tweets', { q: "%23Putin" } , function (err, data, response)
-    {
-        res.send(data);
-    })
-    return;
-});
-
-app.get('/analyze_tweet', function(req, res) {
-    // Creates a client
-    const client = new language.LanguageServiceClient();
-
-    const text = 'Your text to analyze, e.g. Hello, world!';
-
-    // Prepares a document, representing the provided text
-    const document = {
-        content: text,
-        type: 'PLAIN_TEXT',
-    };
-
-    // Detects entities in the document
-    // const [result] = await client.analyzeEntities({document});
-    const [result] = client.analyzeEntities({document});
-
-    const entities = result.entities;
-
-    console.log('Entities:');
-    entities.forEach(entity => {
-        console.log(entity.name);
-        console.log(` - Type: ${entity.type}, Salience: ${entity.salience}`);
-        if (entity.metadata && entity.metadata.wikipedia_url) {
-            console.log(` - Wikipedia URL: ${entity.metadata.wikipedia_url}$`);
+            let tweet = tweets[i];
+            let text = tweet.text;
+            const document = {
+                content: text,
+                type: 'PLAIN_TEXT',
+                language: 'en',
+            };
+        
+            // Detects the sentiment of the text
+            client
+            .analyzeSentiment({document: document})
+            .then(results => {
+                const sentiment = results[0].documentSentiment;
+                tweet.sentiment = sentiment.score; 
+                tweet.save(function (err) {
+                    if(err) {
+                        console.log(err);
+                    }
+                });
+            })
+            .catch(err => {
+                console.error('ERROR:', err);
+            });
         }
+    });
+    
+    res.redirect('back');
+    return;
+});
+
+app.get('/create_graph/:woeid/:query', function(req,res) {
+    Tweet.find({ woeid: req.params.woeid, trend: req.params.query, sentiment: { $exists: true }  }, function (err, tweets) {
+        let scores = [];
+        for (let i = 0; i < tweets.length; i++)
+        {
+            let tweet = tweets[i];
+            scores.push(tweet["sentiment"]);
+        }
+        console.log(scores);
+        res.redirect('back');
+
     });
     return;
 });
