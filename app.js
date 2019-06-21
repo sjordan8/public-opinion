@@ -7,12 +7,12 @@ const bodyParser = require('body-parser');
 const Twit = require('twit');
 const keys = require('./config/keys');
 
-let City = require('./models/city');
-let Tweet = require('./models/tweet');
+const City = require('./models/city');
+const Tweet = require('./models/tweet');
 
 mongoose.connect('mongodb://localhost/opinion');
 
-let db = mongoose.connection;
+const db = mongoose.connection;
 
 const client = new language.LanguageServiceClient();
 
@@ -30,6 +30,10 @@ const T = new Twit({
   access_token:         keys.access_token,
   access_token_secret:  keys.access_token_secret,
 })
+
+
+
+
 
 const app = express();
 
@@ -71,7 +75,7 @@ app.get('/us', function(req, res) {
 app.get('/get_cities', function(req, res) {
     T.get('trends/available', function (err, data, response)
     {
-        let trends = data;
+        const trends = data;
         for (let i = 0; i < trends.length; i++)
         {
             let trend = trends[i];
