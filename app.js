@@ -66,11 +66,6 @@ app.get('/add', function(req, res) {
 
 
 
-app.get('/us', function(req, res) {
-    res.sendFile('/static/us.json', { root: __dirname });
-    return;
-});
-
 //Trends Function
 app.get('/get_cities', function(req, res) {
     T.get('trends/available', function (err, data, response)
@@ -248,6 +243,8 @@ app.get('/create_graph/:woeid/:query', function(req,res) {
     });
     return;
 });
+
+console.log("Now listening on port 5000");
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT);
