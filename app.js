@@ -10,7 +10,7 @@ const keys = require('./config/keys');
 const City = require('./models/city');
 const Tweet = require('./models/tweet');
 
-mongoose.connect('mongodb://localhost/opinion');
+mongoose.connect('mongodb://localhost/opinion', { useNewUrlParser: true });
 
 const db = mongoose.connection;
 
@@ -59,39 +59,34 @@ app.get('/', function(req, res) {
     });
 });
 
-app.get('/add', function(req, res) {
-    res.render('add');
-    return;
-});
-
-
-
 //Trends Function
 app.get('/get_cities', function(req, res) {
     T.get('trends/available', function (err, data, response)
     {
-        const trends = data;
-        for (let i = 0; i < trends.length; i++)
+        for (let i = 0; i < data.length; i++)
         {
-            let trend = trends[i];
+            let trend = data[i];
             if (trend["country"] == "United States")
             {
-                let place = trend["placeType"];
-                if (place["name"] == "Town")
+                let placeType = trend["placeType"];
+                if (placeType["name"] == "Town")
                 {
                     City.find({ name: trend["name"] }, function(err, cities){
                         if(err){
                             console.log(err);
                         } else {
-                            let city = new City();
-                            city.name = trend["name"];
-                            city.woeid = trend["woeid"];
-
-                            city.save(function(err) {
+                            if(cities.length == 0)
+                            {
+                              let city = new City();
+                              city.name = trend["name"];
+                              city.woeid = trend["woeid"];
+                              city.save(function(err) {
                                 if(err) {
-                                    console.log(err);
+                                  console.log(err);
                                 } 
-                            });
+                              });
+                            }
+                          console.log(cities.length);
                         }
                     });
                 }
@@ -99,7 +94,7 @@ app.get('/get_cities', function(req, res) {
         }
         console.log("Written Cities!");
         res.redirect('back');
-    })
+    });
     return;
 });
 
@@ -238,10 +233,44 @@ app.get('/create_graph/:woeid/:query', function(req,res) {
             scores.push(tweet["sentiment"]);
         }
         console.log(scores);
-        res.redirect('back');
+        for (let i = 0; i < scores.length; i++)
+        {
+          let negative = 0;
+          let positive = 0;
+          let neutral = 0;
 
+          if (scores[i] > 0.3)
+            positive++;
+          else if(scores[i] > -0.3)
+            neutral++;
+          else
+            negative++;
+        }
+        res.redirect('back');
     });
     return;
+});
+
+app.get('/remove_duplicates', function(req, res) {
+    City.find({}, function (err, cities) {
+      for (let i = 0; i < cities.length; i++)
+      {
+        if(i != cities.length - 1)
+        {
+          let cur = cities[i];
+          let next = cities[i+1];
+          if( cur["name"] == next["name"] )
+          {
+            City.deleteOne({ name: cur["name"] }, function(err) {
+              if(err)
+                console.log(err);
+            });
+          }
+        }
+      }
+    });
+    console.log('Deleted duplicates');
+    res.redirect('back');
 });
 
 console.log("Now listening on port 5000");
