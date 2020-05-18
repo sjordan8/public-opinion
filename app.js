@@ -5,14 +5,15 @@ const language = require('@google-cloud/language');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const Twit = require('twit');
-const keys = require('./config/keys');
+require('dotenv').config();
 
-let City = require('./models/city');
-let Tweet = require('./models/tweet');
 
-mongoose.connect('mongodb://localhost/opinion');
+const City = require('./models/city');
+const Tweet = require('./models/tweet');
 
-let db = mongoose.connection;
+// Example URL for localhost: (mongodb://localhost/opinion)
+mongoose.connect(process.env.MONGODB_URL, { useNewUrlParser: true });
+const db = mongoose.connection;
 
 const client = new language.LanguageServiceClient();
 
@@ -25,10 +26,10 @@ db.on('error', function(err) {
 });
 
 const T = new Twit({
-  consumer_key:         keys.consumer_key,
-  consumer_secret:      keys.consumer_secret,
-  access_token:         keys.access_token,
-  access_token_secret:  keys.access_token_secret,
+  consumer_key:         process.env.CONSUMER_KEY,
+  consumer_secret:      process.env.CONSUMER_SECRET,
+  access_token:         process.env.ACCESS_TOKEN,
+  access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
 })
 
 const app = express();
@@ -43,8 +44,8 @@ app.set('view engine', 'pug');
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.get('/', function(req, res) {
-    City.find({}, function(err, cities){
+app.get('/', (req, res) => {
+    City.find({}, (err, cities) => {
         if(err){
             console.log(err);
         } else {
@@ -55,44 +56,34 @@ app.get('/', function(req, res) {
     });
 });
 
-app.get('/add', function(req, res) {
-    res.render('add');
-    return;
-});
-
-
-
-app.get('/us', function(req, res) {
-    res.sendFile('/static/us.json', { root: __dirname });
-    return;
-});
-
 //Trends Function
 app.get('/get_cities', function(req, res) {
     T.get('trends/available', function (err, data, response)
     {
-        let trends = data;
-        for (let i = 0; i < trends.length; i++)
+        for (let i = 0; i < data.length; i++)
         {
-            let trend = trends[i];
+            let trend = data[i];
             if (trend["country"] == "United States")
             {
-                let place = trend["placeType"];
-                if (place["name"] == "Town")
+                let placeType = trend["placeType"];
+                if (placeType["name"] == "Town")
                 {
                     City.find({ name: trend["name"] }, function(err, cities){
                         if(err){
                             console.log(err);
                         } else {
-                            let city = new City();
-                            city.name = trend["name"];
-                            city.woeid = trend["woeid"];
-
-                            city.save(function(err) {
+                            if(cities.length == 0)
+                            {
+                              let city = new City();
+                              city.name = trend["name"];
+                              city.woeid = trend["woeid"];
+                              city.save(function(err) {
                                 if(err) {
-                                    console.log(err);
+                                  console.log(err);
                                 } 
-                            });
+                              });
+                            }
+                          console.log(cities.length);
                         }
                     });
                 }
@@ -100,7 +91,7 @@ app.get('/get_cities', function(req, res) {
         }
         console.log("Written Cities!");
         res.redirect('back');
-    })
+    });
     return;
 });
 
@@ -239,11 +230,47 @@ app.get('/create_graph/:woeid/:query', function(req,res) {
             scores.push(tweet["sentiment"]);
         }
         console.log(scores);
-        res.redirect('back');
+        for (let i = 0; i < scores.length; i++)
+        {
+          let negative = 0;
+          let positive = 0;
+          let neutral = 0;
 
+          if (scores[i] > 0.3)
+            positive++;
+          else if(scores[i] > -0.3)
+            neutral++;
+          else
+            negative++;
+        }
+        res.redirect('back');
     });
     return;
 });
+
+app.get('/remove_duplicates', function(req, res) {
+    City.find({}, function (err, cities) {
+      for (let i = 0; i < cities.length; i++)
+      {
+        if(i != cities.length - 1)
+        {
+          let cur = cities[i];
+          let next = cities[i+1];
+          if( cur["name"] == next["name"] )
+          {
+            City.deleteOne({ name: cur["name"] }, function(err) {
+              if(err)
+                console.log(err);
+            });
+          }
+        }
+      }
+    });
+    console.log('Deleted duplicates');
+    res.redirect('back');
+});
+
+console.log("Now listening on port 5000");
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT);
