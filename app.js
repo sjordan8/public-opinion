@@ -5,7 +5,7 @@ const language = require('@google-cloud/language');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const Twit = require('twit');
-const keys = require('./config/keys');
+require('dotenv').config();
 
 const City = require('./models/city');
 const Tweet = require('./models/tweet');
@@ -25,10 +25,10 @@ db.on('error', function(err) {
 });
 
 const T = new Twit({
-  consumer_key:         keys.consumer_key,
-  consumer_secret:      keys.consumer_secret,
-  access_token:         keys.access_token,
-  access_token_secret:  keys.access_token_secret,
+  consumer_key:         process.env.CONSUMER_KEY,
+  consumer_secret:      process.env.CONSUMER_SECRET,
+  access_token:         process.env.ACCESS_TOKEN,
+  access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
 })
 
 
