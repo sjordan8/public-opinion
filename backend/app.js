@@ -11,21 +11,20 @@ require('dotenv').config();
 const City = require('./models/city');
 const Tweet = require('./models/tweet');
 
-const mongoURL = process.env.MONGODB_URL || 'mongodb://localhost';
 // Example URL for localhost: (mongodb://localhost/opinion)
-mongoose.connect(mongoURL, { useNewUrlParser: true });
+const mongoURL = process.env.MONGODB_URL || 'mongodb://localhost';
+mongoose.connect(mongoURL, { useNewUrlParser: true, useUnifiedTopology: true });
+
 
 const db = mongoose.connection;
-
-const client = new language.LanguageServiceClient();
-
 db.once('open', () => {
     console.log('Server connected to mongoDB');
 });
-
 db.on('error', (err) => {
-    console.log(err);
+    console.error(err);
 });
+
+const client = new language.LanguageServiceClient();
 
 const T = new Twit({
     consumer_key:         process.env.CONSUMER_KEY,
@@ -47,9 +46,9 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 app.get('/', (req, res) => {
-    City.find({}, (err, cities) => {
+    City.find((err, cities) => {
         if (err) {
-            console.log(err);
+            console.error(err);
         } else {
             res.render('index', {
                 cities: cities
