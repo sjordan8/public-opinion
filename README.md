@@ -28,4 +28,3 @@ docker-compose up
 ```
 
 The application should be running on port 8080
-
