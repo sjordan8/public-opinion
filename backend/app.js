@@ -11,25 +11,27 @@ require('dotenv').config();
 const City = require('./models/city');
 const Tweet = require('./models/tweet');
 
+const mongoURL = process.env.MONGODB_URL || 'mongodb://localhost';
 // Example URL for localhost: (mongodb://localhost/opinion)
-mongoose.connect(process.env.MONGODB_URL, { useNewUrlParser: true });
+mongoose.connect(mongoURL, { useNewUrlParser: true });
+
 const db = mongoose.connection;
 
 const client = new language.LanguageServiceClient();
 
-db.once('open', function() {
+db.once('open', () => {
     console.log('Server connected to mongoDB');
 });
 
-db.on('error', function(err) {
+db.on('error', (err) => {
     console.log(err);
 });
 
 const T = new Twit({
-  consumer_key:         process.env.CONSUMER_KEY,
-  consumer_secret:      process.env.CONSUMER_SECRET,
-  access_token:         process.env.ACCESS_TOKEN,
-  access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
+    consumer_key:         process.env.CONSUMER_KEY,
+    consumer_secret:      process.env.CONSUMER_SECRET,
+    access_token:         process.env.ACCESS_TOKEN,
+    access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
 })
 
 const app = express();
@@ -46,7 +48,7 @@ app.use(bodyParser.json());
 
 app.get('/', (req, res) => {
     City.find({}, (err, cities) => {
-        if(err){
+        if (err) {
             console.log(err);
         } else {
             res.render('index', {
@@ -57,33 +59,28 @@ app.get('/', (req, res) => {
 });
 
 //Trends Function
-app.get('/get_cities', function(req, res) {
-    T.get('trends/available', function (err, data, response)
-    {
-        for (let i = 0; i < data.length; i++)
-        {
+app.get('/get_cities', (req, res) => {
+    T.get('trends/available', (err, data, response) => {
+        for (let i = 0; i < data.length; i++) {
             let trend = data[i];
-            if (trend["country"] == "United States")
-            {
+            if (trend["country"] == "United States") {
                 let placeType = trend["placeType"];
-                if (placeType["name"] == "Town")
-                {
-                    City.find({ name: trend["name"] }, function(err, cities){
-                        if(err){
+                if (placeType["name"] == "Town") {
+                    City.find({ name: trend["name"] }, (err, cities) => {
+                        if (err) {
                             console.log(err);
                         } else {
-                            if(cities.length == 0)
-                            {
-                              let city = new City();
-                              city.name = trend["name"];
-                              city.woeid = trend["woeid"];
-                              city.save(function(err) {
-                                if(err) {
-                                  console.log(err);
-                                } 
-                              });
+                            if (cities.length == 0) {
+                                let city = new City();
+                                city.name = trend["name"];
+                                city.woeid = trend["woeid"];
+                                city.save((err) => {
+                                    if (err) {
+                                        console.log(err);
+                                    } 
+                                });
                             }
-                          console.log(cities.length);
+                            console.log(cities.length);
                         }
                     });
                 }
@@ -95,24 +92,18 @@ app.get('/get_cities', function(req, res) {
     return;
 });
 
-app.get('/get_coordinates', function(req, res) {
-
-    City.find({ centroid: [] }, function (err, cities) {
-        for (let i = 0; i < cities.length; i++)
-        {
+app.get('/get_coordinates', (req, res) => {
+    City.find({ centroid: [] }, (err, cities) => {
+        for (let i = 0; i < cities.length; i++) {
             let city = cities[i];
-            T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, function (err, data, response)
-            {
-                if (err)
-                {
+            T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, (err, data, response) => {
+                if (err) {
                     console.log(err);
                     return;
-                }
-                else
-                {
+                } else {
                     let obj = data.result.places[0];
                     city.centroid = obj["centroid"];
-                    city.save(function(err) {
+                    city.save((err) => {
                         if (err)
                             console.log(err);
                     });
@@ -121,49 +112,46 @@ app.get('/get_coordinates', function(req, res) {
             })
         }
     });
+
     res.redirect('back');
     return;
 });
 
-app.get('/get_trends/:woeid', function(req, res) {
-    City.find({ woeid: req.params.woeid }, function (err, cities) { 
+app.get('/get_trends/:woeid', (req, res) => {
+    City.find({ woeid: req.params.woeid }, (err, cities) => { 
         let city = cities[0];
-        T.get('trends/place', { id: req.params.woeid }, function (err, data, response)
-        {
+        T.get('trends/place', { id: req.params.woeid }, (err, data, response) => {
             let obj = data[0];
             let topTrends = obj["trends"];
             let trends = topTrends.slice(0,10);
 
             city.trends = trends;
-            city.save(function(err) {
+            city.save((err) => {
                 if (err)
                     console.log(err);
             });
             res.redirect('back');
-
         })
     });
+
     return;
 });
 
-app.get('/get_tweets/:woeid/:query', function(req, res) {
-    City.find({ woeid: req.params.woeid }, function (err, cities) {
+app.get('/get_tweets/:woeid/:query', (req, res) => {
+    City.find({ woeid: req.params.woeid }, (err, cities) => {
         let city = cities[0];
         let latitude = city.centroid[1];
         let longitude = city.centroid[0];
         let r = "5mi";
         let geo = [ latitude, longitude, r ];
-        T.get('search/tweets', { q: req.params.query, geocode: geo, count: "100" } , function (err, data, response)
-        {
-            if(err) {
+        T.get('search/tweets', { q: req.params.query, geocode: geo, count: "100" } , (err, data, response) => {
+            if (err) {
                 console.log(err);
-            }
-            else {
+            } else {
                 let tweets = data.statuses;
-                for( let i = 0; i < tweets.length; i++)
-                {
+                for (let i = 0; i < tweets.length; i++) {
                     let t = tweets[i];
-                    Tweet.find({ id: t.id }, function (err, tweets) {
+                    Tweet.find({ id: t.id }, (err, tweets) => {
                         if (tweets.length == 0) {
                             let tweet = new Tweet();
                             tweet.created_at = t.created_at;
@@ -171,8 +159,8 @@ app.get('/get_tweets/:woeid/:query', function(req, res) {
                             tweet.id = t.id;
                             tweet.woeid = req.params.woeid;
                             tweet.trend = req.params.query;
-                            tweet.save(function(err) {
-                                if(err) {
+                            tweet.save((err) => {
+                                if (err) {
                                     console.log(err);
                                 }
                             });
@@ -184,13 +172,13 @@ app.get('/get_tweets/:woeid/:query', function(req, res) {
             }
         })     
     });
+
     return;
 });
 
-app.get('/analyze_tweets', function(req, res) {
-    Tweet.find({ sentiment: null }, function (err, tweets) {
-        for(let i = 0; i < tweets.length; i++)
-        {
+app.get('/analyze_tweets', (req, res) => {
+    Tweet.find({ sentiment: null }, (err, tweets) => {
+        for (let i = 0; i < tweets.length; i++) {
             let tweet = tweets[i];
             let text = tweet.text;
             const document = {
@@ -205,8 +193,8 @@ app.get('/analyze_tweets', function(req, res) {
             .then(results => {
                 const sentiment = results[0].documentSentiment;
                 tweet.sentiment = sentiment.score; 
-                tweet.save(function (err) {
-                    if(err) {
+                tweet.save((err) => {
+                    if (err) {
                         console.log(err);
                     }
                 });
@@ -221,50 +209,45 @@ app.get('/analyze_tweets', function(req, res) {
     return;
 });
 
-app.get('/create_graph/:woeid/:query', function(req,res) {
-    Tweet.find({ woeid: req.params.woeid, trend: req.params.query, sentiment: { $exists: true }  }, function (err, tweets) {
+app.get('/create_graph/:woeid/:query', (req,res) => {
+    Tweet.find({ woeid: req.params.woeid, trend: req.params.query, sentiment: { $exists: true }  }, (err, tweets) => {
         let scores = [];
-        for (let i = 0; i < tweets.length; i++)
-        {
+        for (let i = 0; i < tweets.length; i++) {
             let tweet = tweets[i];
             scores.push(tweet["sentiment"]);
         }
         console.log(scores);
-        for (let i = 0; i < scores.length; i++)
-        {
-          let negative = 0;
-          let positive = 0;
-          let neutral = 0;
+        for (let i = 0; i < scores.length; i++) {
+            let negative = 0;
+            let positive = 0;
+            let neutral = 0;
 
-          if (scores[i] > 0.3)
-            positive++;
-          else if(scores[i] > -0.3)
-            neutral++;
-          else
-            negative++;
+            if (scores[i] > 0.3)
+                positive++;
+            else if(scores[i] > -0.3)
+                neutral++;
+            else
+                negative++;
         }
         res.redirect('back');
     });
     return;
 });
 
-app.get('/remove_duplicates', function(req, res) {
-    City.find({}, function (err, cities) {
-      for (let i = 0; i < cities.length; i++)
-      {
-        if(i != cities.length - 1)
-        {
-          let cur = cities[i];
-          let next = cities[i+1];
-          if( cur["name"] == next["name"] )
-          {
-            City.deleteOne({ name: cur["name"] }, function(err) {
-              if(err)
-                console.log(err);
-            });
-          }
+app.get('/remove_duplicates', (req, res) => {
+    City.find({}, (err, cities) => {
+        for (let i = 0; i < cities.length; i++) {
+            if (i != cities.length - 1) {
+                let cur = cities[i];
+                let next = cities[i+1];
+                if ( cur["name"] == next["name"] ) {
+                    City.deleteOne({ name: cur["name"] }, (err) => {
+                        if (err)
+                            console.log(err);
+                    });
+                }
+            }
         }
-      }
     });
     console.log('Deleted duplicates');
     res.redirect('back');
