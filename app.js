@@ -7,11 +7,12 @@ const bodyParser = require('body-parser');
 const Twit = require('twit');
 require('dotenv').config();
 
+
 const City = require('./models/city');
 const Tweet = require('./models/tweet');
 
-mongoose.connect('mongodb://localhost/opinion', { useNewUrlParser: true });
-
+// Example URL for localhost: (mongodb://localhost/opinion)
+mongoose.connect(process.env.MONGODB_URL, { useNewUrlParser: true });
 const db = mongoose.connection;
 
 const client = new language.LanguageServiceClient();
@@ -31,10 +32,6 @@ const T = new Twit({
   access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
 })
 
-
-
-
-
 const app = express();
 
 app.use(express.static('static'));
@@ -47,8 +44,8 @@ app.set('view engine', 'pug');
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.get('/', function(req, res) {
-    City.find({}, function(err, cities){
+app.get('/', (req, res) => {
+    City.find({}, (err, cities) => {
         if(err){
             console.log(err);
         } else {
