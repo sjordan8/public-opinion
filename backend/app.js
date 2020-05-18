@@ -14,6 +14,7 @@ const Tweet = require('./models/tweet');
 const mongoURL = process.env.MONGODB_URL || 'mongodb://localhost';
 // Example URL for localhost: (mongodb://localhost/opinion)
 mongoose.connect(mongoURL, { useNewUrlParser: true });
+
 const db = mongoose.connection;
 
 const client = new language.LanguageServiceClient();
