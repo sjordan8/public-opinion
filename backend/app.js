@@ -11,91 +11,107 @@ require('dotenv').config();
 const City = require('./models/city');
 const Tweet = require('./models/tweet');
 
-// Example URL for localhost: (mongodb://localhost/opinion)
-const mongoURL = process.env.MONGODB_URL || 'mongodb://localhost';
-mongoose.connect(mongoURL, { useNewUrlParser: true, useUnifiedTopology: true });
+function connectToDbWithLog() {
+    // Example URL for localhost: (mongodb://localhost/opinion)
+    const mongoURL = process.env.MONGODB_URL || 'mongodb://localhost';
+    mongoose.connect(mongoURL, { useNewUrlParser: true, useUnifiedTopology: true });
 
+    const db = mongoose.connection;
+    db.once('open', () => {
+        console.log('Server connected to mongoDB');
+    });
+    db.on('error', (err) => {
+        console.error(err);
+    });
+};
 
-const db = mongoose.connection;
-db.once('open', () => {
-    console.log('Server connected to mongoDB');
-});
-db.on('error', (err) => {
-    console.error(err);
-});
+function newAppWithMiddleware() {
+    const app = express();
+    app.use(express.static('static'));
 
-const client = new language.LanguageServiceClient();
+    // Pug middleware
+    app.set('views', path.join(__dirname, 'views'));
+    app.set('view engine', 'pug');
 
-const T = new Twit({
-    consumer_key:         process.env.CONSUMER_KEY,
-    consumer_secret:      process.env.CONSUMER_SECRET,
-    access_token:         process.env.ACCESS_TOKEN,
-    access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
-})
+    // Body Parse Middleware
+    app.use(bodyParser.urlencoded({ extended: false }));
+    app.use(bodyParser.json());
 
-const app = express();
+    return app;
+};
 
-app.use(express.static('static'));
+function newGoogleApi() {
+    return new language.LanguageServiceClient();
+};
 
-// Pug middleware
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'pug');
+function newTwitApi() {
+    return new Twit({
+        consumer_key:         process.env.CONSUMER_KEY,
+        consumer_secret:      process.env.CONSUMER_SECRET,
+        access_token:         process.env.ACCESS_TOKEN,
+        access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
+    });
+};
 
-// Body Parse Middleware
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-
-app.get('/', (req, res) => {
-    City.find((err, cities) => {
-        if (err) {
-            console.error(err);
-        } else {
-            res.render('index', {
-                cities: cities
-            });
+async function getAllCities() {
+    const listOfAllCities = await City.find((err, cities) => {
+        if (!err) {
+            return cities;
         }
+        console.error(err);
+    });
+    return listOfAllCities;
+};
+
+function isTrendInUnitedStates(trend) {
+    return trend.country == "United States" && trend.placeType.name == "Town";
+};
+
+async function createNewCityInDb(trend) {
+    const cities = await getCitiesByName(trend.name);
+
+    if (cities.length === 0) {
+        let city = new City();
+        city.name = trend.name;
+        city.woeid = trend.woeid;
+        city.save();
+        
+        return true;
+    }
+    return false;
+};
+
+async function getCityByName(cityName) {
+    return await City.find({ name: cityName });
+};
+
+connectToDbWithLog();
+const GoogleApi = newGoogleApi();
+const TwitApi = newTwitApi();
+const app = newAppWithMiddleware();
+
+
+app.get('/', async (req, res) => {
+    const cities = await getAllCities();
+    res.render('index', {
+        cities: cities
     });
 });
 
-//Trends Function
 app.get('/get_cities', (req, res) => {
-    T.get('trends/available', (err, data, response) => {
-        for (let i = 0; i < data.length; i++) {
-            let trend = data[i];
-            if (trend["country"] == "United States") {
-                let placeType = trend["placeType"];
-                if (placeType["name"] == "Town") {
-                    City.find({ name: trend["name"] }, (err, cities) => {
-                        if (err) {
-                            console.log(err);
-                        } else {
-                            if (cities.length == 0) {
-                                let city = new City();
-                                city.name = trend["name"];
-                                city.woeid = trend["woeid"];
-                                city.save((err) => {
-                                    if (err) {
-                                        console.log(err);
-                                    } 
-                                });
-                            }
-                            console.log(cities.length);
-                        }
-                    });
-                }
-            }
-        }
+    TwitApi.get('trends/available', (err, trends, response) => {
+        let trendsInUS = trends.filter(isTrendInUnitedStates);
+        trendsInUS.forEach(createNewCityInDb);
         console.log("Written Cities!");
         res.redirect('back');
     });
-    return;
 });
 
 app.get('/get_coordinates', (req, res) => {
     City.find({ centroid: [] }, (err, cities) => {
         for (let i = 0; i < cities.length; i++) {
             let city = cities[i];
-            T.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, (err, data, response) => {
+            TwitApi.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, (err, data, response) => {
                 if (err) {
                     console.log(err);
                     return;
@@ -113,13 +129,12 @@ app.get('/get_coordinates', (req, res) => {
     });
 
     res.redirect('back');
-    return;
 });
 
 app.get('/get_trends/:woeid', (req, res) => {
     City.find({ woeid: req.params.woeid }, (err, cities) => { 
         let city = cities[0];
-        T.get('trends/place', { id: req.params.woeid }, (err, data, response) => {
+        TwitApi.get('trends/place', { id: req.params.woeid }, (err, data, response) => {
             let obj = data[0];
             let topTrends = obj["trends"];
             let trends = topTrends.slice(0,10);
@@ -143,7 +158,7 @@ app.get('/get_tweets/:woeid/:query', (req, res) => {
         let longitude = city.centroid[0];
         let r = "5mi";
         let geo = [ latitude, longitude, r ];
-        T.get('search/tweets', { q: req.params.query, geocode: geo, count: "100" } , (err, data, response) => {
+        TwitApi.get('search/tweets', { q: req.params.query, geocode: geo, count: "100" } , (err, data, response) => {
             if (err) {
                 console.log(err);
             } else {
@@ -187,8 +202,7 @@ app.get('/analyze_tweets', (req, res) => {
             };
         
             // Detects the sentiment of the text
-            client
-            .analyzeSentiment({document: document})
+            GoogleApi.analyzeSentiment({document: document})
             .then(results => {
                 const sentiment = results[0].documentSentiment;
                 tweet.sentiment = sentiment.score; 
@@ -233,13 +247,16 @@ app.get('/create_graph/:woeid/:query', (req,res) => {
     return;
 });
 
-app.get('/remove_duplicates', (req, res) => {
+app.get('/remove_duplicates', async (req, res) => {
+    const allCities = await getAllCities() 
+    allCities
+    /*
     City.find({}, (err, cities) => {
         for (let i = 0; i < cities.length; i++) {
             if (i != cities.length - 1) {
                 let cur = cities[i];
                 let next = cities[i+1];
-                if ( cur["name"] == next["name"] ) {
+                if (cur["name"] == next["name"] ) {
                     City.deleteOne({ name: cur["name"] }, (err) => {
                         if (err)
                             console.log(err);
@@ -248,6 +265,7 @@ app.get('/remove_duplicates', (req, res) => {
             }
         }
     });
+    */
     console.log('Deleted duplicates');
     res.redirect('back');
 });
