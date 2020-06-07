@@ -62,7 +62,7 @@ function isTrendInUnitedStates(trend) {
 };
 
 async function createNewCityInDb(trend) {
-    const cities = await getCityByName(trend.name);
+    const cities = await getCitiesByName(trend.name);
 
     if (cities.length === 0) {
         let city = new City();
@@ -75,7 +75,7 @@ async function createNewCityInDb(trend) {
     return false;
 };
 
-async function getCityByName(cityName) {
+async function getCitiesByName(cityName) {
     return await City.find({ name: cityName });
 };
 
@@ -83,7 +83,7 @@ async function getCitiesWithNoCoordinates() {
     return await City.find({ centroid: [] });
 };
 
-async function getTwitterLocationObject(city) {
+async function getTwitterLocationObjectByCity(city) {
     return await TwitApi.get('geo/search', { 
         query: city.name,
         granularity: "city",
@@ -98,14 +98,30 @@ async function getTwitterLocationObject(city) {
 };
 
 async function setCityCoordinates(city) {
-    let locationObject = await getTwitterLocationObject(city);
+    const locationObject = await getTwitterLocationObjectByCity(city);
     city.centroid = locationObject.centroid;
     city.save();
     return;
 };
 
+async function getCitiesByWoeid(id) {
+    return await City.find({ woeid: id });
+};
 
+async function setCityTrends(city) {
+    const trends = await getTwitterTrendsByWoeid(city.woeid);
+    city.trends = trends;
+    city.save();
+    return;
+};
 
+async function getTwitterTrendsByWoeid(woeid) {
+    return await TwitApi.get('trends/place', { id: req.params.woeid }, (err, data, response) => {
+        const trendsContainer = data[0];
+        const trends = trendsContainer.trends;
+        return trends.slice(0,10);
+    });
+};
 
 
 
@@ -124,7 +140,7 @@ app.get('/', async (req, res) => {
 
 app.get('/get_cities', (req, res) => {
     TwitApi.get('trends/available', (err, trends, response) => {
-        let trendsInUS = trends.filter(isTrendInUnitedStates);
+        const trendsInUS = trends.filter(isTrendInUnitedStates);
         trendsInUS.forEach(createNewCityInDb);
         console.log("Written Cities!");
         res.redirect('back');
@@ -137,22 +153,10 @@ app.get('/get_coordinates', async (req, res) => {
     res.redirect('back');
 });
 
-app.get('/get_trends/:woeid', (req, res) => {
-    City.find({ woeid: req.params.woeid }, (err, cities) => { 
-        let city = cities[0];
-        TwitApi.get('trends/place', { id: req.params.woeid }, (err, data, response) => {
-            let obj = data[0];
-            let topTrends = obj["trends"];
-            let trends = topTrends.slice(0,10);
-
-            city.trends = trends;
-            city.save((err) => {
-                if (err)
-                    console.log(err);
-            });
-            res.redirect('back');
-        })
-    });
+app.get('/get_trends/:woeid', async (req, res) => {
+    const cities = await getCitiesByWoeid(req.params.woeid);
+    setCityTrends(cities[0]);
+    res.redirect('back');
     return;
 });
 
