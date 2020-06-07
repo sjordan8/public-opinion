@@ -61,7 +61,7 @@ function isTrendInUnitedStates(trend) {
     return trend.country == "United States" && trend.placeType.name == "Town";
 };
 
-async function createNewCityInDb(trend) {
+async function createNewCityInDb(citiesAdded, trend) {
     const cities = await getCitiesByName(trend.name);
 
     if (cities.length === 0) {
@@ -70,10 +70,10 @@ async function createNewCityInDb(trend) {
         city.woeid = trend.woeid;
         city.save();
         
-        return true;
+        return citiesAdded + 1;
     }
 
-    return false;
+    return citiesAdded;
 };
 
 async function getCitiesByName(cityName) {
@@ -126,23 +126,27 @@ async function setCityTrends(city) {
 
 connectToDbWithLog();
 const GoogleApi = newGoogleApi();
+console.log("created new google API");
 const TwitApi = newTwitApi();
+console.log("created new twit API");
 const app = newAppWithMiddleware();
+console.log("created new app with middleware");
+
 
 
 app.get('/', async (req, res) => {
-    const cities = await getAllCities();
     res.render('index', {
-        cities: cities
+        cities: await getAllCities()
     });
 });
 
 app.get('/get_cities', (req, res) => {
-    TwitApi.get('trends/available', (err, trends, response) => {
+    TwitApi.get('trends/available', async (err, trends, response) => {
         const trendsInUS = trends.filter(isTrendInUnitedStates);
-        trendsInUS.forEach(createNewCityInDb);
-        console.log("Written Cities!");
+        const numberOfCitiesAdded = await trendsInUS.reduce(createNewCityInDb, 0);
+        console.log("Number of cities added: ", numberOfCitiesAdded);
         res.redirect('back');
+        return;
     });
 });
 
@@ -155,7 +159,7 @@ app.get('/get_coordinates', async (req, res) => {
 
 app.get('/get_trends/:woeid', async (req, res) => {
     const cities = await getCitiesByWoeid(req.params.woeid);
-    setCityTrends(cities[0]);
+    await setCityTrends(cities[0]);
     res.redirect('back');
 });
 
