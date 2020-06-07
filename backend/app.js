@@ -72,6 +72,7 @@ async function createNewCityInDb(trend) {
         
         return true;
     }
+
     return false;
 };
 
@@ -83,25 +84,23 @@ async function getCitiesWithNoCoordinates() {
     return await City.find({ centroid: [] });
 };
 
-async function getTwitterLocationObjectByCity(city) {
-    return await TwitApi.get('geo/search', { 
+async function setCityCoordinates(city) {
+    await TwitApi.get('geo/search', { 
         query: city.name,
         granularity: "city",
         max_results: "1"
     }, (err, data, response) => {
         if (!err) {
-            return data.result.places[0]; 
-        }
-        console.log(err);
-        return { "centroid": "" };
-    });
-};
+            const locationObject = data.result.places[0]; 
+            city.centroid = locationObject.centroid;
+            city.save();
 
-async function setCityCoordinates(city) {
-    const locationObject = await getTwitterLocationObjectByCity(city);
-    city.centroid = locationObject.centroid;
-    city.save();
-    return;
+            return;
+        }
+
+        console.log(err);
+        return;
+    });
 };
 
 async function getCitiesByWoeid(id) {
@@ -109,17 +108,17 @@ async function getCitiesByWoeid(id) {
 };
 
 async function setCityTrends(city) {
-    const trends = await getTwitterTrendsByWoeid(city.woeid);
-    city.trends = trends;
-    city.save();
-    return;
-};
+    await TwitApi.get('trends/place', { id: city.woeid }, (err, data, response) => {
+        if (!err) {
+            const trendsContainer = data[0];
+            city.trends = trendsContainer.trends;
+            city.save();
 
-async function getTwitterTrendsByWoeid(woeid) {
-    return await TwitApi.get('trends/place', { id: req.params.woeid }, (err, data, response) => {
-        const trendsContainer = data[0];
-        const trends = trendsContainer.trends;
-        return trends.slice(0,10);
+            return; 
+        }
+
+        console.log(err);
+        return;
     });
 };
 
@@ -149,6 +148,7 @@ app.get('/get_cities', (req, res) => {
 
 app.get('/get_coordinates', async (req, res) => {
     let cities = await getCitiesWithNoCoordinates();
+    console.log("Number of cities with no coordinates: ", cities.length);
     cities.forEach(setCityCoordinates);
     res.redirect('back');
 });
@@ -157,7 +157,6 @@ app.get('/get_trends/:woeid', async (req, res) => {
     const cities = await getCitiesByWoeid(req.params.woeid);
     setCityTrends(cities[0]);
     res.redirect('back');
-    return;
 });
 
 app.get('/get_tweets/:woeid/:query', (req, res) => {
