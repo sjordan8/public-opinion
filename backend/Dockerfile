@@ -1,14 +1,16 @@
 FROM node:10
 
-WORKDIR /usr/src/app
+RUN mkdir -p /opt/app
+WORKDIR /opt/app
 
-COPY package*.json ./
+COPY package*.json /opt/app/
 ENV MONGODB_URL mongodb://public-opinion_mongodb_1
 RUN npm install
+RUN npm install -g nodemon
 # If you are building you code for production
 # RUN npm ci --only=production
 
-COPY . .
+COPY . /opt/app/
 
 EXPOSE 5000
-CMD [ "node", "app.js" ]
+CMD [ "nodemon", "app.js" ]

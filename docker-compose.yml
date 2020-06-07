@@ -4,6 +4,8 @@ services:
     build: ./backend
     ports:
       - "5000:5000"
+    volumes:
+      - ./backend:/opt/app
     depends_on:
       - mongodb
   mongodb:

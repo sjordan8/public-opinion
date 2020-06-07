@@ -54,13 +54,7 @@ function newTwitApi() {
 };
 
 async function getAllCities() {
-    const listOfAllCities = await City.find((err, cities) => {
-        if (!err) {
-            return cities;
-        }
-        console.error(err);
-    });
-    return listOfAllCities;
+    return await City.find();
 };
 
 function isTrendInUnitedStates(trend) {
