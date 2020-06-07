@@ -62,7 +62,7 @@ function isTrendInUnitedStates(trend) {
 };
 
 async function createNewCityInDb(trend) {
-    const cities = await getCitiesByName(trend.name);
+    const cities = await getCityByName(trend.name);
 
     if (cities.length === 0) {
         let city = new City();
@@ -78,6 +78,36 @@ async function createNewCityInDb(trend) {
 async function getCityByName(cityName) {
     return await City.find({ name: cityName });
 };
+
+async function getCitiesWithNoCoordinates() {
+    return await City.find({ centroid: [] });
+};
+
+async function getTwitterLocationObject(city) {
+    return await TwitApi.get('geo/search', { 
+        query: city.name,
+        granularity: "city",
+        max_results: "1"
+    }, (err, data, response) => {
+        if (!err) {
+            return data.result.places[0]; 
+        }
+        console.log(err);
+        return { "centroid": "" };
+    });
+};
+
+async function setCityCoordinates(city) {
+    let locationObject = await getTwitterLocationObject(city);
+    city.centroid = locationObject.centroid;
+    city.save();
+    return;
+};
+
+
+
+
+
 
 connectToDbWithLog();
 const GoogleApi = newGoogleApi();
@@ -101,27 +131,9 @@ app.get('/get_cities', (req, res) => {
     });
 });
 
-app.get('/get_coordinates', (req, res) => {
-    City.find({ centroid: [] }, (err, cities) => {
-        for (let i = 0; i < cities.length; i++) {
-            let city = cities[i];
-            TwitApi.get('geo/search', { query: city["name"], granularity: "city", max_results: "1" }, (err, data, response) => {
-                if (err) {
-                    console.log(err);
-                    return;
-                } else {
-                    let obj = data.result.places[0];
-                    city.centroid = obj["centroid"];
-                    city.save((err) => {
-                        if (err)
-                            console.log(err);
-                    });
-                    console.log(city["centroid"]);
-                }
-            })
-        }
-    });
-
+app.get('/get_coordinates', async (req, res) => {
+    let cities = await getCitiesWithNoCoordinates();
+    cities.forEach(setCityCoordinates);
     res.redirect('back');
 });
 
@@ -141,7 +153,6 @@ app.get('/get_trends/:woeid', (req, res) => {
             res.redirect('back');
         })
     });
-
     return;
 });
 
