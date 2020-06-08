@@ -84,8 +84,8 @@ async function getCitiesWithNoCoordinates() {
     return await City.find({ centroid: [] });
 };
 
-async function setCityCoordinates(city) {
-    await TwitApi.get('geo/search', { 
+function setCityCoordinates(city) {
+    TwitApi.get('geo/search', { 
         query: city.name,
         granularity: "city",
         max_results: "1"
@@ -94,7 +94,6 @@ async function setCityCoordinates(city) {
             const locationObject = data.result.places[0]; 
             city.centroid = locationObject.centroid;
             city.save();
-
             return;
         }
 
@@ -107,20 +106,6 @@ async function getCitiesByWoeid(id) {
     return await City.find({ woeid: id });
 };
 
-async function setCityTrends(city) {
-    await TwitApi.get('trends/place', { id: city.woeid }, (err, data, response) => {
-        if (!err) {
-            const trendsContainer = data[0];
-            city.trends = trendsContainer.trends;
-            city.save();
-
-            return; 
-        }
-
-        console.log(err);
-        return;
-    });
-};
 
 
 
@@ -155,51 +140,68 @@ app.get('/get_coordinates', async (req, res) => {
     console.log("Number of cities with no coordinates: ", cities.length);
     cities.forEach(setCityCoordinates);
     res.redirect('back');
+    return;
 });
 
 app.get('/get_trends/:woeid', async (req, res) => {
     const cities = await getCitiesByWoeid(req.params.woeid);
-    await setCityTrends(cities[0]);
-    res.redirect('back');
+    const city = cities[0];
+
+    TwitApi.get('trends/place', { id: city.woeid }, (err, data, response) => {
+        if (!err) {
+            const trendsContainer = data[0];
+            city.trends = trendsContainer.trends;
+            city.save();
+            res.redirect('back');
+            return; 
+        }
+        
+        console.log(err);
+        res.redirect('back');
+        return;
+    });
 });
 
-app.get('/get_tweets/:woeid/:query', (req, res) => {
-    City.find({ woeid: req.params.woeid }, (err, cities) => {
-        let city = cities[0];
-        let latitude = city.centroid[1];
-        let longitude = city.centroid[0];
-        let r = "5mi";
-        let geo = [ latitude, longitude, r ];
-        TwitApi.get('search/tweets', { q: req.params.query, geocode: geo, count: "100" } , (err, data, response) => {
-            if (err) {
-                console.log(err);
-            } else {
-                let tweets = data.statuses;
-                for (let i = 0; i < tweets.length; i++) {
-                    let t = tweets[i];
-                    Tweet.find({ id: t.id }, (err, tweets) => {
-                        if (tweets.length == 0) {
-                            let tweet = new Tweet();
-                            tweet.created_at = t.created_at;
-                            tweet.text = t.text;
-                            tweet.id = t.id;
-                            tweet.woeid = req.params.woeid;
-                            tweet.trend = req.params.query;
-                            tweet.save((err) => {
-                                if (err) {
-                                    console.log(err);
-                                }
-                            });
-                        }
-                    });
-                }
-                console.log("Added around " + tweets.length + " tweets to the DB");
-                res.redirect('back');
-            }
-        })     
-    });
+app.get('/get_tweets/:woeid/:query', async (req, res) => {
+    const cities = await getCitiesByWoeid(req.params.woeid);
+    
+    let city = cities[0];
+    
+    let latitude = city.centroid[1];
+    let longitude = city.centroid[0];
+    let radius = "5mi";
+    let geo = [ latitude, longitude, radius ];
 
-    return;
+    TwitApi.get('search/tweets', { q: req.params.query, geocode: geo, count: "100" } , (err, data, response) => {
+        if (err) {
+            console.log(err);
+        } else {
+            let tweets = data.statuses;
+            for (let i = 0; i < tweets.length; i++) {
+                let t = tweets[i];
+                Tweet.find({ id: t.id }, (err, tweets) => {
+                    if (tweets.length == 0) {
+                        let tweet = new Tweet();
+                        tweet.created_at = t.created_at;
+                        tweet.text = t.text;
+                        tweet.id = t.id;
+                        tweet.woeid = req.params.woeid;
+                        tweet.trend = req.params.query;
+                        tweet.save((err) => {
+                            if (err) {
+                                console.log(err);
+                            }
+                        });
+                    }
+                });
+            }
+
+            console.log("Added around " + tweets.length + " tweets to the DB");
+            res.redirect('back');
+            return;
+        }
+    })     
+
 });
 
 app.get('/analyze_tweets', (req, res) => {
