@@ -127,11 +127,11 @@ const createGeocode = (city) => {
     return [ latitude, longitude, radius ];
 };
 
-const createTweets = async (tweets) => {
+const createTweets = async (tweets, woeid, trend) => {
     let tweetsCreated = 0;
 
     for (let i = 0; i < tweets.length; i++) {
-        let success = await createTweet(tweets[i]);
+        let success = await createTweet(tweets[i], woeid, trend);
 
         if (success)
             tweetsCreated++;
@@ -140,17 +140,17 @@ const createTweets = async (tweets) => {
     return tweetsCreated;
 };
 
-const createTweet = async (tweet) => {
+const createTweet = async (tweet, woeid, trend) => {
     const tweetsWithSameId = await getTweetsById(tweet.id);
 
     if (tweetsWithSameId.length == 0) {
-        const tweet = new Tweet();
-        tweet.created_at = currentTweet.created_at;
-        tweet.text = currentTweet.text;
-        tweet.id = currentTweet.id;
-        tweet.woeid = req.params.woeid;
-        tweet.trend = req.params.query;
-        tweet.save();
+        const currentTweet = new Tweet();
+        currentTweet.created_at = tweet.created_at;
+        currentTweet.text = tweet.text;
+        currentTweet.id = tweet.id;
+        currentTweet.woeid = woeid;
+        currentTweet.trend = trend;
+        currentTweet.save();
 
         return true;
     }
@@ -199,8 +199,7 @@ app.get('/get_coordinates', async (req, res) => {
 });
 
 app.get('/get_trends/:woeid', async (req, res) => {
-    const cities = await getCitiesByWoeid(req.params.woeid);
-    const city = cities[0];
+    const [ city ] = await getCitiesByWoeid(req.params.woeid);
 
     TwitApi.get('trends/place', { id: city.woeid }, (err, data, response) => {
         if (!err) {
@@ -223,7 +222,7 @@ app.get('/get_tweets/:woeid/:query', async (req, res) => {
     TwitApi.get('search/tweets', { q: req.params.query, geocode: geocode, count: "100" } , async (err, data, response) => {
         if (!err) {
             const tweets = data.statuses;
-            const tweetsAdded = await createTweets(tweets);
+            const tweetsAdded = await createTweets(tweets, req.params.woeid, req.params.query);
 
             console.log("Added " + tweetsAdded.length + " tweets to the database");
             res.redirect('back');
