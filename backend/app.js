@@ -129,9 +129,10 @@ const createGeocode = (city) => {
 
 const createTweets = async (tweets, woeid, trend) => {
     let tweetsCreated = 0;
+    let success;
 
     for (let i = 0; i < tweets.length; i++) {
-        let success = await createTweet(tweets[i], woeid, trend);
+        success = await createTweet(tweets[i], woeid, trend);
 
         if (success)
             tweetsCreated++;
@@ -287,28 +288,6 @@ app.get('/create_graph/:woeid/:query', (req,res) => {
         }
         res.redirect('back');
     });
-});
-
-app.get('/remove_duplicates', async (req, res) => {
-    const allCities = await getAllCities() 
-    /*
-    City.find({}, (err, cities) => {
-        for (let i = 0; i < cities.length; i++) {
-            if (i != cities.length - 1) {
-                let cur = cities[i];
-                let next = cities[i+1];
-                if (cur["name"] == next["name"] ) {
-                    City.deleteOne({ name: cur["name"] }, (err) => {
-                        if (err)
-                            console.log(err);
-                    });
-                }
-            }
-        }
-    });
-    */
-    console.log('Deleted duplicates');
-    res.redirect('back');
 });
 
 console.log("Now listening on port 5000");
