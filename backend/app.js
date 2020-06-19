@@ -57,7 +57,7 @@ const getAllCities = async () => {
     return await City.find();
 };
 
-const isTrendInUnitedStates = (trend) => {
+const trendIsInUnitedStates = (trend) => {
     return trend.country == "United States" && trend.placeType.name == "Town";
 };
 
@@ -66,6 +66,7 @@ const createNewCities = async (arrayOfTrends) => {
 
     for (let i = 0; i < arrayOfTrends.length; i++) {
         let success = await createNewCity(arrayOfTrends[i]);
+        console.log("Creating tweet #: " + i);
 
         if (success) {
             citiesCreated++;
@@ -184,7 +185,7 @@ app.get('/', async (req, res) => {
 
 app.get('/get_cities', (req, res) => {
     TwitApi.get('trends/available', async (err, trends, response) => {
-        const trendsInUS = trends.filter(isTrendInUnitedStates);
+        const trendsInUS = trends.filter(trendIsInUnitedStates);
         const citiesCreated = await createNewCities(trendsInUS);
         console.log("Number of cities added: ", citiesCreated);
         res.redirect('back');
