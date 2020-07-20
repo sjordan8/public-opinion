@@ -29,10 +29,6 @@ const newAppWithMiddleware = () => {
     const app = express();
     app.use(express.static('static'));
 
-    // Pug middleware
-    app.set('views', path.join(__dirname, 'views'));
-    app.set('view engine', 'pug');
-
     // Body Parse Middleware
     app.use(bodyParser.urlencoded({ extended: false }));
     app.use(bodyParser.json());
@@ -178,9 +174,23 @@ console.log("created new app with middleware");
 
 
 app.get('/', async (req, res) => {
+    const options = {
+        root: path.join(__dirname, 'views'),
+        dotfiles: 'deny',
+        headers: {
+            'x-timestamp': Date.now(),
+            'x-sent': true
+        }
+    }
+
+    res.sendFile('index.html', options); 
+
+
+    /*
     res.render('index', {
         cities: await getAllCities()
     });
+    */
 });
 
 app.get('/get_cities', (req, res) => {
@@ -205,7 +215,7 @@ app.get('/get_trends/:woeid', async (req, res) => {
 
     TwitApi.get('trends/place', { id: city.woeid }, (err, data, response) => {
         if (!err) {
-            const trendsContainer = data[0];
+           const trendsContainer = data[0];
             city.trends = trendsContainer.trends;
             city.save();
             res.redirect('back');
